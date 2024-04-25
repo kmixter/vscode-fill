@@ -29,6 +29,11 @@ export function activate(context: vscode.ExtensionContext) {
 		const document = event.document;
 		const editor = vscode.window.visibleTextEditors.find(editor => editor.document === document);
 
+		// Check if the current file is not plaintext, exit early
+		if (document.languageId !== 'plaintext') {
+			return;
+		}
+
 		if (!editor) {
 			console.log('No editor found for the document');
 			return;
