@@ -3,13 +3,20 @@
   "displayName": "vscode-fill",
   "description": "Provides emacs fill-paragraph and auto-fill mode",
   "version": "0.0.1",
+	"publisher": "mixterComm",
+	"repository": {
+		"type": "git",
+		"url": "https://github.com/kmixter/vscode-fill.git"
+	},
   "engines": {
     "vscode": "^1.88.0"
   },
   "categories": [
     "Other"
   ],
-  "activationEvents": [ "*" ],
+  "activationEvents": [
+    "onLanguage"
+  ],
   "main": "./out/extension.js",
   "contributes": {
     "commands": [

@@ -1,9 +1,29 @@
 // The module 'vscode' contains the VS Code extensibility API
 // Import the module and reference it with the alias vscode in your code below
+import { start } from 'repl';
 import * as vscode from 'vscode';
 
-function getWordWrapColumn() {
+function GetWordWrapColumn() {
 	return vscode.workspace.getConfiguration('editor').get('rulers', [80])[0];
+}
+
+function GetFollowerPrefix(prefix: string): string {
+	return prefix.replace(/\*/g, match => ' '.repeat(match[0].length));
+}
+
+function GetLinePrefix(line: string): [string, string] {
+	const match = line.match(/^(\s*(\/\/|\*|#)?\s*)\S/);
+	if (!match) {
+		return ['', ''];
+	}
+	const prefix = match[1];
+	const alternativePrefix = GetFollowerPrefix(prefix)
+
+	return [prefix, GetFollowerPrefix(prefix)];
+}
+
+function couldStart(first: string, second: string): boolean {
+	return first === second || GetFollowerPrefix(first) === second;
 }
 
 // This method is called when your extension is activated
@@ -40,7 +60,7 @@ export function activate(context: vscode.ExtensionContext) {
 		}
 
 		// Retrieve the value of editor.ruler from the settings
-		const wordWrapColumn = getWordWrapColumn();
+		const wordWrapColumn = GetWordWrapColumn();
 
 		const currentCol = editor.selection.active.character;
 		if (currentCol < wordWrapColumn) {
@@ -50,12 +70,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 		const lineText = document.lineAt(currentLine).text;
 
-		// Check if the current line is a paragraph and capture the prefix
-		const match = lineText.match(/^(\s*(\/\/|\*|#)?\s*)\S/);
-		if (!match) {
-			return;
-		}
-		const prefix = match[1];
+		const prefix = GetLinePrefix(lineText)[1]
 
 		// Find the last space before currentCol on this line that's after the prefix
 		const lastSpaceIndex = lineText.lastIndexOf(' ', currentCol - 1);
@@ -77,35 +92,63 @@ export function activate(context: vscode.ExtensionContext) {
 		const currentLine = cursorPosition.line;
 
 		// Find the last blank line before the current line
+		const currentLineText = textEditor.document.lineAt(currentLine).text;
+		let [prefix, followerPrefix] = GetLinePrefix(currentLineText);
+		let startPrefix = prefix;
+		let regionText = currentLineText.substring(prefix.length);
 		let startLine = currentLine;
-		while (startLine > 0 && textEditor.document.lineAt(startLine - 1).text.trim() !== '') {
-			startLine--;
+
+		while (startLine > 0) {
+			const prevText = textEditor.document.lineAt(startLine - 1).text;
+			const prevPrefix = GetLinePrefix(prevText)[0];
+			if (prevPrefix != prefix) {
+				if (couldStart(prevPrefix, prefix)) {
+					startPrefix = prevPrefix;
+					--startLine;
+				}
+				break;
+			}
+			if (prevText.length == prefix.length) {
+				break;
+			}
+			regionText = prevText.substring(prevPrefix.length) + '\n' + regionText;
+			--startLine;
 		}
 
 		// Find the next blank line after the current line
 		let endLine = currentLine;
-		while (endLine < textEditor.document.lineCount - 1 &&
-			   textEditor.document.lineAt(endLine + 1).text.trim() !== '') {
-			endLine++;
+		while (endLine < textEditor.document.lineCount - 1) {
+			const nextText = textEditor.document.lineAt(endLine + 1).text;
+			const nextPrefix = GetLinePrefix(nextText)[0];
+			if (nextPrefix !== prefix && nextPrefix !== followerPrefix) {
+				break;
+			}
+			if (nextText.length == prefix.length) {
+				break;
+			}
+			regionText += '\n' + nextText.substring(nextPrefix.length);
+			++endLine;
 		}
 
-		// Get the text from the region between the blank lines
-		let regionText = textEditor.document.getText(
-			new vscode.Range(startLine, 0, endLine,
-							 textEditor.document.lineAt(endLine).text.length));
-
-		const wordWrapColumn = getWordWrapColumn();
+		const wordWrapColumn = GetWordWrapColumn();
+		followerPrefix = GetFollowerPrefix(startPrefix);
 
 		// Word wrap the region text at 80 characters
-		const wrappedText = regionText.split(/\s+/).reduce((acc, word) => {
-			const lastLine = acc[acc.length - 1];
-			if (lastLine.length + word.length + 1 > wordWrapColumn) {
-				acc.push(word);
-			} else {
-				acc[acc.length - 1] = lastLine + ' ' + word;
-			}
-			return acc;
-		}, ['']).join('\n').trim();
+		const wrappedText =
+			regionText.split(/\s+/).reduce((acc, word) => {
+				const lastLine = acc[acc.length - 1];
+				if (lastLine.length + word.length + 1 > wordWrapColumn) {
+					acc.push(followerPrefix + word);
+				} else {
+					let newLastLine = lastLine + ' ' + word;
+					if (acc.length == 1 &&
+							lastLine.length == startPrefix.length) {
+						newLastLine = lastLine + word
+					}
+					acc[acc.length - 1] = newLastLine;
+				}
+				return acc;
+			}, [startPrefix]).join('\n');
 
 		// Replace the region with the wrapped text
 		await textEditor.edit(editBuilder => {
