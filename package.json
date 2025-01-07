@@ -2,7 +2,7 @@
   "name": "vscode-fill",
   "displayName": "vscode-fill",
   "description": "Provides emacs fill-paragraph and auto-fill mode",
-  "version": "0.0.2",
+  "version": "0.0.3",
 	"publisher": "mixterComm",
 	"repository": {
 		"type": "git",

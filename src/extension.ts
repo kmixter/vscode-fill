@@ -4,7 +4,11 @@ import { start } from 'repl';
 import * as vscode from 'vscode';
 
 function GetWordWrapColumn() {
-	return vscode.workspace.getConfiguration('editor').get('rulers', [80])[0];
+	const rulers = vscode.workspace.getConfiguration('editor').get('rulers', []);
+	if (!rulers || rulers.length == 0) {
+		return 80;
+	}
+	return rulers[0];
 }
 
 function GetFollowerPrefix(prefix: string): string {
