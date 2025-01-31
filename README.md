@@ -1,7 +1,7 @@
 # vscode-fill README
 
-This extension implements a very basic version of Emacs full-paragraph and
-auto-full mode.
+This extension implements a very basic version of Emacs fill-paragraph and
+auto-fill mode.
 
 ## Features
 
